@@ -14,13 +14,12 @@ function seedStorage(notes) {
 }
 
 /**
- * Helper: returns the note cards list items (each is a <button> wrapping the note content).
+ * Helper: returns the note cards (the clickable card surface).
+ * We intentionally target by test id to avoid ambiguity with the per-card delete button.
  */
 function getNoteCards() {
-  // Notes list only exists when there are notes.
   const list = screen.getByRole("list", { name: /existing notes/i });
-  const items = within(list).getAllByRole("listitem");
-  return items.map((li) => within(li).getByRole("button"));
+  return within(list).getAllByTestId(/^note-card-/i);
 }
 
 beforeEach(() => {

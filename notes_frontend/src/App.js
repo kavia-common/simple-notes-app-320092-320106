@@ -281,10 +281,19 @@ function App() {
                   const isSelected = note.id === selectedId;
                   return (
                     <li key={note.id} className="notesList__item">
-                      <button
-                        type="button"
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        data-testid={`note-card-${note.id}`}
                         className={`noteCard ${isSelected ? "noteCard--selected" : ""}`}
                         onClick={() => setSelectedId(note.id)}
+                        onKeyDown={(e) => {
+                          // Make the note card keyboard-accessible (Enter/Space selects).
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedId(note.id);
+                          }
+                        }}
                         aria-current={isSelected ? "true" : "false"}
                       >
                         <div className="noteCard__main">
@@ -311,7 +320,7 @@ function App() {
                             <span aria-hidden="true">🗑</span>
                           </button>
                         </div>
-                      </button>
+                      </div>
                     </li>
                   );
                 })}
