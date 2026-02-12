@@ -1,8 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import App from "./App";
 
-test("renders notes header", () => {
+test("renders the Notes app shell", () => {
   render(<App />);
-  const heading = screen.getByRole("heading", { name: /notes/i });
-  expect(heading).toBeInTheDocument();
+  expect(screen.getByRole("heading", { level: 1, name: "Notes" })).toBeInTheDocument();
+  expect(screen.getByRole("main", { name: /notes app content/i })).toBeInTheDocument();
 });
