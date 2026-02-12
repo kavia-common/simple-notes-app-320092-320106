@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 
@@ -46,7 +46,7 @@ describe("Notes app", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.type(screen.getByLabelText(/title/i), "My first note");
+    await user.type(screen.getByLabelText(/^title$/i), "My first note");
     await user.type(screen.getByLabelText(/^note$/i), "Body text");
     await user.click(screen.getByRole("button", { name: /^create$/i }));
 
@@ -58,7 +58,7 @@ describe("Notes app", () => {
 
     // Editor reflects selected note.
     expect(screen.getByRole("button", { name: /^save$/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/title/i)).toHaveValue("My first note");
+    expect(screen.getByLabelText(/^title$/i)).toHaveValue("My first note");
     expect(screen.getByLabelText(/^note$/i)).toHaveValue("Body text");
   });
 
@@ -71,12 +71,12 @@ describe("Notes app", () => {
 
     // Loads from storage and shows in list.
     expect(getNoteCards()).toHaveLength(1);
-    expect(screen.getByLabelText(/title/i)).toHaveValue("Old title");
+    expect(screen.getByLabelText(/^title$/i)).toHaveValue("Old title");
     expect(screen.getByLabelText(/^note$/i)).toHaveValue("Old body");
 
     // Edit and save.
-    await user.clear(screen.getByLabelText(/title/i));
-    await user.type(screen.getByLabelText(/title/i), "New title");
+    await user.clear(screen.getByLabelText(/^title$/i));
+    await user.type(screen.getByLabelText(/^title$/i), "New title");
     await user.clear(screen.getByLabelText(/^note$/i));
     await user.type(screen.getByLabelText(/^note$/i), "New body");
 
@@ -95,11 +95,11 @@ describe("Notes app", () => {
     render(<App />);
 
     // Confirm loaded note.
-    expect(screen.getByLabelText(/title/i)).toHaveValue("Stable title");
+    expect(screen.getByLabelText(/^title$/i)).toHaveValue("Stable title");
     expect(screen.getByLabelText(/^note$/i)).toHaveValue("Stable body");
 
     // Start typing changes but do NOT save.
-    await user.type(screen.getByLabelText(/title/i), " (draft)");
+    await user.type(screen.getByLabelText(/^title$/i), " (draft)");
     await user.type(screen.getByLabelText(/^note$/i), " (draft)");
 
     // "Cancel" as implemented by app: click "New note" to leave editing context.
@@ -107,7 +107,7 @@ describe("Notes app", () => {
 
     // Draft cleared; button switches to Create mode.
     expect(screen.getByRole("button", { name: /^create$/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/title/i)).toHaveValue("");
+    expect(screen.getByLabelText(/^title$/i)).toHaveValue("");
     expect(screen.getByLabelText(/^note$/i)).toHaveValue("");
 
     // Existing note should remain unchanged in the list.
@@ -169,36 +169,39 @@ describe("Notes app", () => {
     render(<App />);
 
     // Create triggers persistence.
-    await user.type(screen.getByLabelText(/title/i), "Persist me");
+    await user.type(screen.getByLabelText(/^title$/i), "Persist me");
     await user.type(screen.getByLabelText(/^note$/i), "One");
     await user.click(screen.getByRole("button", { name: /^create$/i }));
 
-    // At least one save for the create.
-    expect(setItemSpy).toHaveBeenCalled();
-    const createCall = setItemSpy.mock.calls.find((c) => c[0] === STORAGE_KEY);
-    expect(createCall).toBeTruthy();
-    const createdStored = JSON.parse(createCall[1]);
-    expect(createdStored).toHaveLength(1);
-    expect(createdStored[0].title).toBe("Persist me");
+    // Wait for the effect-driven save to land, then assert against the *latest* write.
+    await waitFor(() => {
+      const writes = setItemSpy.mock.calls.filter((c) => c[0] === STORAGE_KEY);
+      expect(writes.length).toBeGreaterThan(0);
+      const last = writes.at(-1);
+      const stored = JSON.parse(last[1]);
+      expect(stored).toHaveLength(1);
+      expect(stored[0].title).toBe("Persist me");
+    });
 
     // Edit triggers persistence.
     await user.clear(screen.getByLabelText(/^note$/i));
     await user.type(screen.getByLabelText(/^note$/i), "Two");
     await user.click(screen.getByRole("button", { name: /^save$/i }));
 
-    const lastStorageWrite = setItemSpy.mock.calls
-      .filter((c) => c[0] === STORAGE_KEY)
-      .at(-1);
-    const editedStored = JSON.parse(lastStorageWrite[1]);
-    expect(editedStored).toHaveLength(1);
-    expect(editedStored[0].body).toBe("Two");
+    await waitFor(() => {
+      const lastStorageWrite = setItemSpy.mock.calls.filter((c) => c[0] === STORAGE_KEY).at(-1);
+      const editedStored = JSON.parse(lastStorageWrite[1]);
+      expect(editedStored).toHaveLength(1);
+      expect(editedStored[0].body).toBe("Two");
+    });
 
     // Delete triggers persistence.
     await user.click(screen.getByRole("button", { name: /delete note:\s*persist me/i }));
-    const afterDeleteWrite = setItemSpy.mock.calls
-      .filter((c) => c[0] === STORAGE_KEY)
-      .at(-1);
-    const deletedStored = JSON.parse(afterDeleteWrite[1]);
-    expect(deletedStored).toHaveLength(0);
+
+    await waitFor(() => {
+      const afterDeleteWrite = setItemSpy.mock.calls.filter((c) => c[0] === STORAGE_KEY).at(-1);
+      const deletedStored = JSON.parse(afterDeleteWrite[1]);
+      expect(deletedStored).toHaveLength(0);
+    });
   });
 });
